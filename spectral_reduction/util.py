@@ -3,9 +3,11 @@ try:      from astropy.io import fits as pyfits
 except:   import pyfits
 import numpy as np
 import glob
+import os
+import shutil
 
 #---------------------------------------------------------------------------
-# 
+#
 # kastbias -- perform overscan bias subtraction from KAST images
 #
 # Inputs:
@@ -17,7 +19,7 @@ import glob
 #
 # Description:
 #   Performs KAST bias subtraction.
-#   Adapted from Elinor Gates routine. 
+#   Adapted from Elinor Gates routine.
 #
 # Author:
 #   J. Brown, UCSC Astronomy
@@ -28,7 +30,7 @@ import glob
 # Version 2.0 -- Elinor Gates, 2016 Aug 11 - improved file reading
 # Version 1.0 -- Elinor Gates, 2015 Nov 24
 def kastbias(ifile,ofile):
-    
+
     data, header = pyfits.getdata(ifile,header=True)
 
     # change data to float
@@ -64,7 +66,7 @@ def kastbias(ifile,ofile):
         datasec = data[0:,0:xsize-cover]
 
         # median overscan section
-        bias=np.median(biassec, axis=1) 
+        bias=np.median(biassec, axis=1)
         # subtract overscan
         datanew = datasec
         for i in range(datasec.shape[1]):
@@ -117,8 +119,8 @@ def kastbias(ifile,ofile):
                 datab[:,i]=datab[:,i]-biasb
             # merge dataa and datab into single image
             datanew=np.hstack([dataa,datab])
-        
-    if namps > 2: 
+
+    if namps > 2:
         sys.exit('Program does not yet deal with more than two overscan regions. Exiting.')
 
     # add info to header
@@ -126,6 +128,69 @@ def kastbias(ifile,ofile):
 
     # write new fits file
     pyfits.writeto(ofile,datanew,header,clobber=True)
+
+    return 0
+
+# Parse IRAF-like region as in '[1:4096,1:4112]'
+def parse_iraf_region(regstr):
+    regstr = regstr.replace('[','')
+    regstr = regstr.replace(']','')
+
+    x,y = regstr.split(',')
+    x0,x1 = x.split(':')
+    y0,y1 = y.split(':')
+
+    x0 = int(x0)-1
+    x1 = int(x1)-1
+    y0 = int(y0)-1
+    y1 = int(y1)-1
+
+    return(y0,y1,x0,x1)
+
+def binospecbias(ifile,ofile,options):
+
+    hdu = pyfits.open(ifile)
+    data = hdu['IM5'].data ; header = hdu['IM5'].header
+    # change data to float
+    data=data.astype('float32')
+
+    datareg = options['datasec']
+    biasreg = options['biassec']
+
+    bx0,bx1,by0,by1 = parse_iraf_region(biasreg)
+    tx0,tx1,ty0,ty1 = parse_iraf_region(datareg)
+
+    biassec = data[bx0:bx1+1,by0:by1+1]
+    datasec = data[tx0:tx1+1,ty0:ty1+1]
+
+    # median overscan section
+    bias=np.median(biassec, axis=0)
+    # subtract overscan
+    datanew = datasec
+    for i in range(datasec.shape[1]):
+        datanew[:,i] = datasec[:,i]-bias[i]
+
+    # add info to header
+    header['HISTORY'] = 'Overscan subtracted'
+
+    # write new fits file
+    pyfits.writeto(ofile,datanew,header,clobber=True)
+
+    return 0
+
+def make_arc(list_arc, destFile, options, iraf):
+
+    if os.path.isfile(destFile):
+        os.remove(destFile)
+    if len(list_arc) == 1:
+        arc = list_arc[0]
+        originFile = 'pre_reduced/to{}'.format(arc)
+        shutil.copy(originFile,destFile)
+    else:
+        arc_str = ''
+        for arc in list_arc:
+            arc_str += 'pre_reduced/to{},'.format(arc)
+        iraf.imcombine(arc_str, output=destFile)
 
     return 0
 
@@ -278,7 +343,7 @@ def correctcard(img):
     _header = hdulist[0].header
     hdulist.close()
 
-    ######   change 20161003 
+    ######   change 20161003
     #print a
     #for i in range(len(a)):
     #    if not a[i]:
@@ -385,7 +450,7 @@ def updateheader(image, dimension, headerdict):
             _header.update( { i : (headerdict[i][0], headerdict[i][1]) } )
         imm.flush()
         imm.close()
-        
+
 ##########################################################################
 
 
@@ -542,19 +607,19 @@ def dvex():
     # globals()
     dv = {}
     #dv['line'] = {'Gr16': 300, 'Gr11': 430, 'Gr13': 200, 'GR': 150, 'GB': 430}
-    dv['std'] = {'_t_order': 4, '_t_niter': 20, '_t_sample': '*', '_t_nlost': 20, 
+    dv['std'] = {'_t_order': 4, '_t_niter': 20, '_t_sample': '*', '_t_nlost': 20,
                  '_width': 10, '_radius': 10,
                  '_weights': 'variance',
-                 '_nsum': 30, 
-                 '_t_step': 10, '_t_nsum': 10, 
-                 '_lower': -10, '_upper': 10, 
+                 '_nsum': 30,
+                 '_t_step': 10, '_t_nsum': 10,
+                 '_lower': -10, '_upper': 10,
                  '_b_sample': '-40:-20,20:40',
                  '_b_order': 2, '_resize': 'no'}
-    dv['obj'] = {'_t_order': 4, '_t_niter': 20, '_t_sample': '*', '_t_nlost': 20, 
+    dv['obj'] = {'_t_order': 4, '_t_niter': 20, '_t_sample': '*', '_t_nlost': 20,
                  '_width': 10, '_radius': 10,
                  '_weights': 'variance',
-                 '_nsum': 40, '_t_step': 10, '_t_nsum': 10, 
-                 '_lower': -5, '_upper': 5, 
+                 '_nsum': 40, '_t_step': 10, '_t_nsum': 10,
+                 '_lower': -5, '_upper': 5,
                  '_b_sample': '-25:-15,15:25',
                  '_b_order': 2,
                  '_resize': 'yes'}
@@ -610,10 +675,63 @@ def StoN2(img, show=False):
 
 ################################################
 
+def subtract_background(img, inst, _inter=True):
 
-def extractspectrum(img, dv, inst, _interactive, _type, automaticex=False, host_ex = False, match_aperture = 'n'):
-    # print "LOGX:: Entering `extractspectrum` method/function in
-    # %(__file__)s" % globals()
+    import os
+    from pyraf import iraf
+
+    iraf.noao(_doprint=0)
+    iraf.twodspec(_doprint=0)
+    iraf.longslit(_doprint=0)
+    toforget = ['longslit.background']
+    for t in toforget:
+        iraf.unlearn(t)
+
+    print('\n### Performing independent background subtraction')
+
+    subimg = img.replace('.fits','_subback.fits')
+    skyimg = img.replace('.fits','_sky.fits')
+
+    if os.path.exists(subimg): os.remove(subimg)
+    if os.path.exists(skyimg): os.remove(skyimg)
+
+    # Axis for background subtraction should be opposite dispaxis
+    backaxis = 2
+    if inst.get('dispaxis')==2: backaxis=1
+
+    # Pick best sky line to sample for background subtraction
+    hdu = pyfits.open(img)
+    data = hdu[0].data
+
+    sample = '*'
+    if backaxis==2:
+        backlines = np.average(data, axis=0)
+        line = np.argmax(backlines)+1
+        reg = (line-3,line+3,1,data.shape[1])
+        sample = '[{0}:{1},{2}:{3}]'.format(*reg)
+        print('RECOMMENDED FIT COLUMN={0}'.format(line))
+
+    iraf.longslit.background(input=img, output=subimg,
+        interac=_inter, naverage=2, function='legendre', sample='*',
+        low_reject=5.0, high_reject=5.0, niterate=20, grow=0.0,
+        graphics='stdgraph', order=16, axis=backaxis, mode='h')
+
+    if os.path.exists(img) and os.path.exists(subimg):
+        rawhdu = pyfits.open(img)
+        subhdu = pyfits.open(subimg)
+
+        skydata = rawhdu[0].data - subhdu[0].data
+        newhdu = pyfits.PrimaryHDU(skydata, subhdu[0].header)
+        newhdu.header['HISTORY']='Sky line image'
+        newhdu.writeto(skyimg, overwrite=True, output_verify='silentfix')
+
+    if not os.path.exists(subimg): subimg=None
+    if not os.path.exists(skyimg): skyimg=None
+
+    return(subimg, skyimg)
+
+def extractspectrum(img, dv, inst, _interactive, _type, automaticex=False,
+    host_ex=False, match_flag=False, skyimg=None):
     import glob
     import os
     import string
@@ -718,13 +836,13 @@ def extractspectrum(img, dv, inst, _interactive, _type, automaticex=False, host_
         _upper=dv[_type]['_upper']
         _b_sample = dv[_type]['_b_sample']
 
-        if match_aperture == 'y':
+        if match_flag:
 
             aps = glob.glob('database/ap*')
             for ap in aps:
                 print (ap.split('/')[-1])
             ap_select = raw_input('Choose image to match apertures: ')
-            
+
             #this is just to make things automatic for now
             if 'blue' in ap_select and 'lris' in inst.get('name'):
                 ap_match = ap_select.replace('blue','red')
@@ -739,14 +857,7 @@ def extractspectrum(img, dv, inst, _interactive, _type, automaticex=False, host_
                 ap_match = ap_select.replace('red','blue')
                 ap_binning = 1.
 
-
-            # img_binning = hdr.get('BINNING', None).strip()
-            # if img_binning != None:
-            #     img_binning = float(img_binning.split(',')[0])
             img_binning = inst.get('spatial_binning')
-
-            # ap_binning = raw_input('Enter aperture spatial binning [1]: ') or 1
-            # ap_binning = float(ap_binning)
 
             delete('database/'+ap_match)
             new_apfile = 'database/'+ap_match
@@ -791,43 +902,57 @@ def extractspectrum(img, dv, inst, _interactive, _type, automaticex=False, host_
             _find = 'yes'
             _recenter = 'yes'
             _reference=ap_match[2:]
-            # _reference = 'BD262606_lris_red_1'
-
-
-        # use_diff_aperture = raw_input('Trace different aperture? y/[n]: ')
-        # if use_diff_aperture == 'y':
-        #     aps = glob.glob('../master_files/ap*')
-        #     for ap in aps:
-        #         print (ap.split('/')[-1])
-        #     ap_select = raw_input('Choose ref image from list above: ')
-        #     os.system('cp ' + ' ../master_files/' + ap_select + ' database/'+ap_select)
-        #     _reference = ap_select[2:]
-        #     _fittrac = 'no'
-        #     _trace = 'no'
-
 
         if host_ex:
             _recenter = 'n'
             _trace = 'n'
             _fittrac = 'n'
             _find = 'n'
-        
-        iraf.specred.apall(img, output=imgex, referen=_reference, trace=_trace, fittrac=_fittrac, find=_find,
+
+        iraf.specred.apall(img, output=imgex, referen=_reference, trace=_trace,
+                           fittrac=_fittrac, find=_find,
                            recenter=_recenter, edit=_edit,
-                           nfind=1, backgro='fit', lsigma=3, usigma=3, b_order=dv[_type]['_b_order'],
+                           nfind=1, backgro='fit', lsigma=3, usigma=3,
+                           b_order=dv[_type]['_b_order'],
                            format='multispec', extras='yes',
-                           b_function='chebyshev', b_sample=_b_sample, clean='yes', pfit='fit1d',
-                           lower=_lower, upper=_upper, t_niter=dv[_type]['_t_niter'],
+                           b_function='chebyshev', b_sample=_b_sample,
+                           clean='yes', pfit='fit1d',
+                           lower=_lower, upper=_upper,
+                           t_niter=dv[_type]['_t_niter'],
                            width=dv[_type]['_width'],
-                           radius=dv[_type]['_radius'], 
-                           line=inst.get('approx_extract_column','INDEF'), nsum=dv[_type]['_nsum'], 
+                           radius=dv[_type]['_radius'],
+                           line=inst.get('approx_extract_column','INDEF'),
+                           nsum=dv[_type]['_nsum'],
                            t_step=dv[_type]['_t_step'],
                            t_nsum=dv[_type]['_t_nsum'],
-                           t_nlost=dv[_type]['_t_nlost'], t_sample=dv[
-                               _type]['_t_sample'], resize=_resize,
+                           t_nlost=dv[_type]['_t_nlost'],
+                           t_sample=dv[_type]['_t_sample'], resize=_resize,
                            t_order=dv[_type]['_t_order'],
-                           weights=dv[_type]['_weights'], 
+                           weights=dv[_type]['_weights'],
                            interactive=_interactive, review=_review, mode=_mode)
+
+        # If there is a separate skyimg, then use it to define background
+        if skyimg and os.path.exists(skyimg) and os.path.exists(imgex):
+            hduspec = pyfits.open(imgex)
+            hdusky = pyfits.open(skyimg)
+
+            # Determine what the aperture trace is to match to sky image
+            aperture = hduspec[0].header['APNUM1']
+            naxis1 = hduspec[0].header['NAXIS1']
+            dum1,dum2,y0,y1 = aperture.split()
+            y0 = float(y0) ; y1 = float(y1)
+
+            y = np.arange(naxis1) * (y1-y0)/naxis1 + y0
+            skyspec = np.zeros(naxis1)
+            # Estimate sky spectrum with a fixed aperture of 5 pixels
+            for i,y in enumerate(y):
+                skyspec[i] = np.average(hdusky[0].data[int(y)-2:int(y)+2,i])
+
+            # The 3rd spectrum (index=2) in multispec is always background
+            hduspec[0].data[2,0,:] = skyspec
+            hduspec.writeto(imgex, overwrite=True, output_verify='silentfix')
+
+
     else:
         print('\n### skipping new extraction')
     return imgex
@@ -871,9 +996,9 @@ def get_relevant_ap_data(ap_data, ap_binning, img_binning, inst):
 
         elif 'low' in line and 'reject' not in line:
             if 'kast_blue' in inst.get('name'): #current inst is blue so want to get correct red ap
-                low = str(sign*float(line.split()[1])*(ap_binning/img_binning) + diff) 
+                low = str(sign*float(line.split()[1])*(ap_binning/img_binning) + diff)
             else:
-                low = str(sign*float(line.split()[2])*(ap_binning/img_binning) + diff) 
+                low = str(sign*float(line.split()[2])*(ap_binning/img_binning) + diff)
             lows.append(low)
 
         elif 'high' in line and 'reject' not in line:

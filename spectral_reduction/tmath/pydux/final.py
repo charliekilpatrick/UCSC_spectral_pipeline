@@ -310,7 +310,7 @@ def final(objectlist,gratcode,secondord,gratcode2,user):
             msky=scipyrebinsky(mskywave,mskydata,wave)
             xfactor=10
             maxlag=200
-            if 'kast' in mshead.get('VERSION',''): 
+            if 'kast' in mshead.get('VERSION',''):
                 shift=xcor(msky[50:-50],sky[50:-50],xfactor,maxlag)
             else:
                 shift=xcor(msky,sky,xfactor,maxlag)
@@ -329,7 +329,7 @@ def final(objectlist,gratcode,secondord,gratcode2,user):
             fig.subplots_adjust(hspace=0)
             while (not skyshiftdone):
                 axarr=fig.subplots(2)
-                
+
                 waveplus=wave-angshift
 
                 if not secondtime:
@@ -416,7 +416,7 @@ def final(objectlist,gratcode,secondord,gratcode2,user):
                 wavesave0 = 0.0
                 wavesaven = 0.0
                 print('Enter the new wavelength range desired: ')
-            
+
             waveb,waver=waveparse(wave,wavesave0,wavesaven)
             newbin=(waver-waveb)/newdelt +1.0 #should stay the same now
             # frac,whole=np.modf(newbin)
@@ -563,7 +563,6 @@ def final(objectlist,gratcode,secondord,gratcode2,user):
 
             print('Do you wish to combine with another spectrum? ')
             answer=yesno('y')
-            fname_comb = None
             if (answer == 'y'):
                 plt.close()
                 done=False
@@ -632,8 +631,11 @@ def final(objectlist,gratcode,secondord,gratcode2,user):
                 plt.ylabel('Flux')
                 plt.title(objectname)
                 plt.savefig(objectname + '_combined_ap'+str(i+1) + suffixes['ap'+str(i+1)] +'.png')
-                
+
                 outputdone = False
+                objname = objectname + '-combined'
+                fname_comb=objname+'-'+printdate+'_ap'+str(i+1) + suffixes['ap'+str(i+1)] +'.fits'
+                sname_comb=objname+'-'+printdate+'_ap'+str(i+1) + suffixes['ap'+str(i+1)] +'-sigma.fits'
                 while (not outputdone):
                     print('\nThe file is: {}'.format(inputfile))
                     print('The object is: {}'.format(objectname))
@@ -695,14 +697,13 @@ def final(objectlist,gratcode,secondord,gratcode2,user):
                 spectxt = objname+'-'+printdate+'_ap'+ str(i+1) + suffixes['ap'+str(i+1)] +'.flm'
                 spectxt=spectxt.strip()
                 np.savetxt(spectxt,np.transpose([nwave,finalobj.copy(),finalsig.copy()]))
-              
-            is_final=input('Is this a final reduction? [y]/n: ') or 'y'      
+
+            is_final=input('Is this a final reduction? [y]/n: ') or 'y'
             if is_final:
                 if not os.path.isdir('../../final_reductions/'):
                     os.mkdir('../../final_reductions/')
                 os.system('cp ' + fname + ' ' + '../../final_reductions/'+ fname)
-                if fname_comb:
-                    os.system('cp ' + fname_comb + ' ' + '../../final_reductions/'+ fname_comb)      
+                os.system('cp ' + fname_comb + ' ' + '../../final_reductions/'+ fname_comb)
         print('final')
         print(objectlist,gratcode,secondord,gratcode2)
         plt.close()

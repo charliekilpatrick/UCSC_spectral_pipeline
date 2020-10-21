@@ -1,9 +1,10 @@
 from __future__ import print_function
 import os,sys,pdb,glob,datetime,shutil
-import numpy as np 
+import numpy as np
 from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy import units as u
+import instruments
 
 
 ### M.S. Stolen from J.B.'s spec browser. Primarily used to determine image types for config files
@@ -253,11 +254,29 @@ def make_kast_manifest(dataDir):
 
     return manifest_text
 
+# Added this convenience function for combined imaging/spectroscopy with LRIS.
+# Can extend this to other instruments based on similar header keywords - CDK.
+def needs_to_be_reduced(file):
+
+    hdu = fits.open(file, mode='readonly')
+    header = hdu[0].header
+    arm, inst_dict = instruments.blue_or_red(file)
+    inst = inst_dict['name']
+
+    # Select against imaging mode data for LRIS
+    if 'LRIS' in inst.upper():
+        if 'GRISTRAN' in header.keys() and header['GRISTRAN'].lower()=='stowed':
+            return(False)
+
+    return(True)
 
 def determine_image_type(header,instrument,STANDARD_STAR_LIBRARY):
 
     # init
     nullHeaderEntry = 'UNKNOWN'
+
+    if 'LRIS' in instrument.upper():
+        header['OBJECT']=header['TARGNAME']
 
     if instrument == 'KAST':
         ARC_LAMP_KEYS = ['LAMPSTAH','LAMPSTAG','LAMPSTAF','LAMPSTAE',
@@ -273,6 +292,11 @@ def determine_image_type(header,instrument,STANDARD_STAR_LIBRARY):
                          'FEARGON','DEUTERI']
         FLAT_LAMP_KEYS = ['FLAMP1','FLAMP2']
         expTimeKey = 'TTIME'
+
+    elif instrument == 'BINOSPEC':
+        ARC_LAMP_KEYS = ['HENEAR']
+        FLAT_LAMP_KEYS = ['INCAN']
+        expTimeKey = 'EXPTIME'
 
     else:
         raise ValueError('Instrument {} not supported'.format(instrument))
@@ -313,7 +337,7 @@ def determine_image_type(header,instrument,STANDARD_STAR_LIBRARY):
     # will require a by-hand fix, but that is rather unlikely.
     pointingCenterStr = '{} {}'.format(header.get('RA',nullHeaderEntry),
                                     header.get('DEC',nullHeaderEntry))
-    pointingCenter = SkyCoord(pointingCenterStr, 
+    pointingCenter = SkyCoord(pointingCenterStr,
                               frame='icrs',
                               unit=(u.hourangle, u.deg))
     for i,standardKey in enumerate(STANDARD_STAR_LIBRARY):
@@ -358,13 +382,14 @@ def construct_standard_star_library():
         'ltt2415': StandardStar(ra='05:56:24.74', dec='-27:51:32.4'),
         'ltt3218': StandardStar(ra='08:41:32.43', dec='-32:56:32.9'),
         'ltt3864': StandardStar(ra='10:32:13.62', dec='-35:37:41.7'),
-        'ltt4364': StandardStar(ra='11:45:42.92', dec='-64:50:29.5')
+        'ltt4364': StandardStar(ra='11:45:42.92', dec='-64:50:29.5'),
+        'g24-9': StandardStar(ra='20:13:56.05', dec='+06:42:55.2')
         }
     return ssl
 
 
 class StandardStar():
     def __init__(self,ra='',dec=''):
-        self.coord = SkyCoord('{} {}'.format(ra,dec), 
+        self.coord = SkyCoord('{} {}'.format(ra,dec),
                                 frame='icrs',
                                 unit=(u.hourangle, u.deg))

@@ -1,5 +1,5 @@
 from __future__ import print_function
-import os,sys,pdb,argparse,shutil,glob,subprocess,shlex
+import os,sys,pdb,argparse,shutil,glob,subprocess,shlex,copy
 from time import sleep
 import numpy as np
 
@@ -11,6 +11,7 @@ from scipy import signal
 from scipy import interpolate
 from scipy import optimize
 from scipy import signal, ndimage
+from scipy import stats
 
 from optparse import OptionParser
 import instruments
@@ -49,8 +50,8 @@ class fitFlatClass(object):
 
     '''
     def __init__(self,image,fig,inst):
-        ''' 
-        Initialize the object 
+        '''
+        Initialize the object
 
         Parameters
         ----------
@@ -59,55 +60,55 @@ class fitFlatClass(object):
         fig : bool, optional
             A figure instance displaying the current state of the class
         '''
-        
+
         # data
         self.rawData = 1.*image # observed
         self.flatModelData = 1.*image # model
         self.flatCorrData = 1.*image # new flat (obs corrected by model)
         self.masterProfile = 0.*image[:,0] + 1. # single column illumination profile
-        
+
         # figure
         self.fig = fig
         self.inst = inst
-        
+
         # spline smoothing (used in fitting)
         # use larger values to accept worse fits,
         # smaller values to mimic true spline
         self.splineSmooth = 1.
-        
+
         # dict of fit regions
         self.regionDict = {}
-        
-        
+
+
         # dummy region dict
         self.dummyRegion = {'colLo': -1,
                             'colUp': -1,
                             'done': False,
                             'store': False}
-        
+
     def skyRegion_onClick(self,event):
         ''' General function for handling clicks on the canvas '''
         return
-        
+
     def skyRegion_onKeyPress(self,event):
         ''' General function for handling key presses on the canvas '''
 
         # get the axes for plotting and cursor detection
         ax_list = self.fig.axes
-        
+
         ax1 = ax_list[0]
         ax2 = ax_list[1]
         ax3 = ax_list[2]
         ax4 = ax_list[3]
         ax5 = ax_list[4]
-                
+
         # make sure the cursor was in the correct axis
         if event.inaxes is ax4:
-        
+
             # get the cursor position
             rowPress = event.ydata
             colPress = event.xdata
-            
+
             # match row to nearst existing pixel
             if rowPress < 0:
                 row = 0
@@ -115,7 +116,7 @@ class fitFlatClass(object):
                 row = rowPress
             else:
                 row = self.rawData.shape[0]
-                
+
             # match col to nearest existing pixel
             if colPress < 0:
                 col = 0
@@ -123,36 +124,36 @@ class fitFlatClass(object):
                 col = colPress
             else:
                 col = self.rawData.shape[1]
-            
-                
+
+
             if event.key == 'l':
                 outStr = 'Adding lower column'
                 print(outStr)
                 self.dummyRegion['colLo'] = col
-            
-            elif event.key == 'u': 
+
+            elif event.key == 'u':
                 outStr = 'Adding upper column'
                 print(outStr)
                 self.dummyRegion['colUp'] = col
-            
+
             elif event.key == 'd':
                 outStr = 'Adding region to dict'
                 print(outStr)
                 self.dummyRegion['done'] = True
                 self.dummyRegion['store'] = True
-            
+
             elif event.key == 'q':
                 outStr = 'Discarding region'
                 print(outStr)
                 self.dummyRegion['done'] = True
                 self.dummyRegion['store'] = False
-                        
+
             else:
                 print('Unrecognized key')
-        
-        
+
+
         return
-        
+
     def add_fit_region(self,name,colLo=-1,colUp=-1):
         '''
         Add a fitting region to the current sky model object
@@ -170,16 +171,16 @@ class fitFlatClass(object):
         -------
         int : 0, and modifies self.regionDict
         '''
-        
+
         # reset the dummy region dict
         self.dummyRegion['colLo'] = -1
         self.dummyRegion['colUp'] = -1
         self.dummyRegion['done'] = False
         self.dummyRegion['store'] = False
-        
+
         # init region
         newRegion = flatFitRegion(name)
-                
+
         # get the axes for plotting and cursor detection
         ax_list = self.fig.axes
         ax1 = ax_list[0]
@@ -187,52 +188,52 @@ class fitFlatClass(object):
         ax3 = ax_list[2]
         ax4 = ax_list[3]
         ax5 = ax_list[4]
-        
+
         # user gave regions
         if colLo > 0 and colUp > 0:
-            
+
             # populate the dummy variable
             self.dummyRegion['colLo'] = colLo
             self.dummyRegion['colUp'] = colUp
             self.dummyRegion['done'] = True
             self.dummyRegion['store'] = True
-        
-        # enter interactive    
+
+        # enter interactive
         else:
-        
+
             # print instructions
             outStr = 'Hover over the row you\'d like to add\n'
             outStr += 'Press L to mark a lower column\n'
             outStr += 'Press U to mark an upper column\n'
             outStr += 'Press D to add the region\n'
             outStr += 'Press Q to discard the region\n'
-            print(outStr)            
-            
+            print(outStr)
+
             # connect the key press event here
             cid = self.fig.canvas.mpl_connect('button_press_event', self.skyRegion_onClick)
             cid2 = self.fig.canvas.mpl_connect('key_press_event', self.skyRegion_onKeyPress)
-            
+
             lnL = ''
             lnU = ''
-            
+
             while not self.dummyRegion['done']:
-                
+
                 if lnL:
                     lnL.remove()
                 if lnU:
                     lnU.remove()
-                                                
+
                 lnL = ax4.axvline(x=self.dummyRegion['colLo'],c='#0d8202',lw=2.,ls='--')
                 lnU = ax4.axvline(x=self.dummyRegion['colUp'],c='#6ef961',lw=2.,ls='--')
-                
+
                 # update the plot
                 plt.pause(0.05)
 
             # disconnect
-            self.fig.canvas.mpl_disconnect(cid)                
-            self.fig.canvas.mpl_disconnect(cid2)                
+            self.fig.canvas.mpl_disconnect(cid)
+            self.fig.canvas.mpl_disconnect(cid2)
 
-                
+
         # flip order if necessary
         if self.dummyRegion['colLo'] > self.dummyRegion['colUp']:
             errStr = 'Had to flip the high/low columns...'
@@ -240,32 +241,32 @@ class fitFlatClass(object):
             colTemp = self.dummyRegion['colLo']
             self.dummyRegion['colLo'] = self.dummyRegion['colUp']
             self.dummyRegion['colUp'] = colTemp
-            
+
         # assign values
         colLo = int(self.dummyRegion['colLo'])
         colUp = int(self.dummyRegion['colUp'])
         newRegion.colLo = colLo
         newRegion.colUp = colUp
         newRegion.flux = self.rawData[:,colLo:colUp]
-        
+
         # store in the dict
         if self.dummyRegion['store']:
             self.regionDict[name] = newRegion
-            
-            
+
+
         # update the plot
         self.refresh_plot()
-        
+
         return 0
 
     def remove_fit_region(self,name=''):
         ''' Pops self.regionDict[name] '''
-               
+
         if len(name) > 0:
             trash = self.regionDict.pop(name, None)
-                
+
         elif len(name) == 0:
-            
+
             while True:
                 outStr = 'Here\'s the info on the fitting regions:\n'
                 for key in self.regionDict.keys():
@@ -273,63 +274,63 @@ class fitFlatClass(object):
                     outStr += '{} {} {}\n'.format(region.name,region.colLo,region.colUp)
                 outStr += 'Enter the name of the region to delete, or Q to quit: '
                 usrResp = raw_input(outStr).strip().upper()
-            
+
                 # delete the entry
                 if usrResp in self.regionDict.keys():
                     trash = self.regionDict.pop(usrResp, None)
                     self.refresh_plot()
                     break
-                    
+
                 elif usrResp == 'Q':
                     outStr = 'Quitting region deletion...'
                     print(outStr)
                     break
-                    
+
                 else:
                     outStr = 'I do not understand, try again...'
                     print(outStr)
-                    
+
         else:
             outStr = 'Something went wrong...'
             print(outStr)
-            
-        
+
+
         return 0
-        
-        
+
+
     def update_master_profile(self):
         ''' Updates the master profile '''
-        
+
         maskedData = np.array([])
         colArr = np.array([])
-        
+
         # unpack the exclusion regions
         for key in self.regionDict.keys():
             region = self.regionDict[key]
             newCols = np.arange(region.colLo,region.colUp,1)
             colArr = np.append(colArr,newCols)
-            
-            
+
+
         maskedData = self.rawData[:,np.arange(self.rawData.shape[1]) != colArr]
         maskedData = maskedData[:,0,:] # weird
-         
-        # snippet for sanity checks           
-        #fig=plt.figure(figsize=(6,6))    
+
+        # snippet for sanity checks
+        #fig=plt.figure(figsize=(6,6))
         #ax1 = plt.subplot2grid((4,4),(0,0),rowspan=2,colspan=4)
         #ax2 = plt.subplot2grid((4,4),(2,0),rowspan=2,colspan=4)
         #ax1.imshow(self.rawData,origin='lower',vmin=0.95,vmax=1.05)
         #ax2.imshow(maskedData,origin='lower',vmin=0.95,vmax=1.05)
         #plt.show(block=True)
         #pdb.set_trace()
-        
+
         updatedProfile = np.median(maskedData,axis=1)
         self.masterProfile = 1.*updatedProfile
-        
+
         return 0
-        
+
     def refresh_plot(self):
         ''' Updates the plot to reflect current state '''
-        
+
         # get the axes for plotting and cursor detection
         ax_list = self.fig.axes
         ax1 = ax_list[0]
@@ -337,13 +338,13 @@ class fitFlatClass(object):
         ax3 = ax_list[2]
         ax4 = ax_list[3]
         ax5 = ax_list[4]
-        
+
         ax1.cla()
         ax2.cla()
         ax3.cla()
         ax4.cla()
         ax5.cla()
-        
+
         modColArr = np.array([])
         # get cols where sky model is defined
         for key in self.regionDict.keys():
@@ -355,17 +356,17 @@ class fitFlatClass(object):
         # ax1 data
         bsd_col_lo = 0
         bsd_col_up = bsd_col_lo + 500
-        
+
         # ax2 data
         # msd_col_lo = self.rawData.shape[1] // 2
         msd_col_lo = 1800
         msd_col_up = msd_col_lo + 300
-        
+
         # ax3 data
         # rsd_col_lo = self.rawData.shape[1] - 500
         rsd_col_lo = 3200
         rsd_col_up = rsd_col_lo + 400
-        
+
         # ax1 data
         blueSkyData = np.median(self.rawData[:,bsd_col_lo:bsd_col_up],axis=0)
         if len(modColArr) > 0:
@@ -374,12 +375,12 @@ class fitFlatClass(object):
             blueSkyModel = 0.*blueSkyData
         blueSkyX = np.arange(bsd_col_lo,bsd_col_up,1)
 
-    
-    
+
+
         # ax2 data
         midSkyData = np.median(self.rawData[:,msd_col_lo:msd_col_up],axis=0)
         midSkyX = np.arange(msd_col_lo,msd_col_up,1)
-    
+
         # ax3 data
         redSkyData = np.median(self.rawData[:,rsd_col_lo:rsd_col_up],axis=0)
         if len(modColArr) > 0:
@@ -399,7 +400,7 @@ class fitFlatClass(object):
 
         #plot profile
         # ax2.plot(midSkyX,midSkyData,c='k',ls='-',lw=3.)
-        
+
         # #plot red sky
         # ax3.plot(redSkyX,redSkyData,c='k',ls='-',lw=3.)
         # ax3.plot(redSkyX,redSkyModel,c='r',ls='--',lw=3.)
@@ -420,7 +421,7 @@ class fitFlatClass(object):
         # residuals
         ax5.imshow(self.flatCorrData,aspect=1.,origin='lower',
                     norm=colors.Normalize(vmin=vmin,vmax=vmax))
-        
+
         # over plot the sky regions
         for key in self.regionDict.keys():
             region = self.regionDict[key]
@@ -428,7 +429,7 @@ class fitFlatClass(object):
             ax4.axvline(x=region.colLo,c='#990000',lw=2,ls='--')
             # upper
             ax4.axvline(x=region.colUp,c='#ff4f4f',lw=2,ls='--')
-            
+
         # sparse axis labels
         ax1.set_xlabel('column')
         ax1.set_ylabel('counts')
@@ -438,70 +439,70 @@ class fitFlatClass(object):
         ax1.set_yticklabels([])
         ax2.set_yticklabels([])
         ax3.set_yticklabels([])
-        
+
         # ranges on image plots
         ax4.set_xlim([0,self.rawData.shape[1]])
         ax4.set_ylim([0,self.rawData.shape[0]])
-        
+
         ax5.set_xlim([0,self.rawData.shape[1]])
         ax5.set_ylim([0,self.rawData.shape[0]])
-        
+
         return 0
-        
+
 
     def fit_sky_background(self,FIT_METHOD='LM'):
         ''' Fit the sky flux and update the sky model '''
-        
+
         # init
         skyImage = np.array([]) # actual sky data
         skyModel = np.array([]) # model of sky data
         skyModelFull = 0.*self.rawData # model across entire chip
         colArr = np.array([])
-        
+
         # update the master profile
         outStr = 'Updating the master profile (takes a bit...)'
         print(outStr)
         self.update_master_profile()
-        
+
         # stack the regions, but preserve the row pixel numbers in rowArr
         # this will be trickier if I implement curved sky regions
         for key in self.regionDict.keys():
             region = self.regionDict[key]
             newCols = np.arange(region.colLo,region.colUp,1)
             colArr = np.append(colArr,newCols)
-            
+
             if len(skyImage) == 0:
                 skyImage = 1.*region.flux
             else:
                 skyImage = np.hstack((skyImage,1.*region.flux))
-                
-                
+
+
         colArr = colArr.astype(int)
-        # for each col, fit flux as a function of pixel number   
-        for i in xrange(skyImage.shape[1]): 
-            if i % 50 == 0:  
+        # for each col, fit flux as a function of pixel number
+        for i in xrange(skyImage.shape[1]):
+            if i % 50 == 0:
                 print('Working on col {} / {}'.format(i,skyImage.shape[1]))
-            
-            # get the fit data for this column            
+
+            # get the fit data for this column
             fitX = np.arange(0,skyImage.shape[0]) # abscissa is row pixel number
 
-            # subtract the masterProfile (illumination), and then fit the 
+            # subtract the masterProfile (illumination), and then fit the
             # result with a smoothed spline. The fit should approximate the sky lines,
             # and the residuals should approximate the pixel-to-pixel sensitivity variations.
             fitY = skyImage[fitX,i] - self.masterProfile
-            
+
             # fit with a smoothed spline
             # note that the results are sensitive to the choice of 's' (the smoothing)
             splineFit = interpolate.UnivariateSpline(fitX, fitY, s=self.splineSmooth)
             skyTheo = splineFit(fitX)
-            
+
             # subtract fit from observed
             residual = self.rawData[:,colArr[i]] - skyTheo
-            
+
             # add residuals (pixel to pixel variations) back in
             skyModelFull[:,colArr[i]] = residual
-            
-            
+
+
             # plot?
             # if colArr[i] == 3348:
             #     PLOT=True
@@ -509,30 +510,30 @@ class fitFlatClass(object):
             #     PLOT=False
             PLOT = False
             if PLOT:
-                fig=plt.figure(figsize=(6,6))    
+                fig=plt.figure(figsize=(6,6))
                 axMain = plt.subplot2grid((4,4),(0,0),rowspan=4,colspan=6)
                 axMain.plot(fitX,fitY,c='k',ls='',marker='.')
                 axMain.plot(fitX,skyTheo,c='r',ls='--',lw=0.5)
                 plt.show()
                 pdb.set_trace()
-                                       
-            
-            
+
+
+
         # insert into the full object image (no trasposing needed??)
         for key in self.regionDict.keys():
             region = self.regionDict[key]
             newCols = np.arange(region.colLo,region.colUp,1)
             newCols = newCols.astype(int)
-            
+
             self.flatModelData[:,newCols] = skyModelFull[:,newCols] # obviously check this
 
         self.refresh_plot()
         return 0
-        
+
         return 0
-        
-        
-        
+
+
+
     def subsitute_model_flat(self):
         ''' Substitutes the model in the masked regions '''
 
@@ -541,10 +542,10 @@ class fitFlatClass(object):
             region = self.regionDict[key]
             newCols = np.arange(region.colLo,region.colUp,1)
             newCols = newCols.astype(int)
-            self.flatCorrData[:,newCols] = 1.*self.flatModelData[:,newCols] 
+            self.flatCorrData[:,newCols] = 1.*self.flatModelData[:,newCols]
 
 
-        if 'blue' in self.inst.get('name'):
+        if 'kast' in self.inst.get('name'):
             std_tol = 0.03 #subject to change
             count = 0
             found_blue = False
@@ -573,8 +574,8 @@ class fitFlatClass(object):
                             found_red = True
                             break
 
-            # good_range = [1200,1300]#kast
-            good_range = [2500,2700]#lris
+
+            good_range = [1200,1300]
             medCols = np.arange(good_range[0],good_range[1],1)
             medCols = medCols.astype(int)
 
@@ -585,7 +586,7 @@ class fitFlatClass(object):
                 self.flatCorrData[:,col] = subdata
 
 
-            if 'red' in self.inst.get('name') and found_red:
+            if 'red' in self.inst.get('name'):
                 num_red_cols = red_ind
                 for col in range(num_blue_cols):
                     neg_col = int(-1.*col)
@@ -594,15 +595,15 @@ class fitFlatClass(object):
 
         self.refresh_plot()
         return 0
-        
-        
+
+
     #
     # Substitutes the data in a user supplied region with self.masterProfile
     # This is useful if there is a region of the data that is simply trash
     #
     def hard_mask(self,name=''):
         ''' Substitutes the master profile in the specified mask region '''
-        
+
         # sub the master profile
         # inefficient, don't care
         if len(name) > 0:
@@ -610,9 +611,9 @@ class fitFlatClass(object):
             colUp = self.regionDict[usrResp].colUp
             for i in xrange(colUp-colLo):
                 self.flatCorrData[:,colLo+i] = self.masterProfile
-            self.refresh_plot()                
+            self.refresh_plot()
         elif len(name) == 0:
-            
+
             while True:
                 outStr = 'Here\'s the info on the fitting regions:\n'
                 for key in self.regionDict.keys():
@@ -620,7 +621,7 @@ class fitFlatClass(object):
                     outStr += '{} {} {}\n'.format(region.name,region.colLo,region.colUp)
                 outStr += 'Enter the name of the region to mask, or Q to quit: '
                 usrResp = raw_input(outStr).strip().upper()
-            
+
                 # sub the master profile
                 # inefficient, don't care
                 if usrResp in self.regionDict.keys():
@@ -630,28 +631,28 @@ class fitFlatClass(object):
                         self.flatCorrData[:,colLo+i] = self.masterProfile
                     self.refresh_plot()
                     break
-                    
+
                 elif usrResp == 'Q':
                     outStr = 'Quitting region deletion...'
                     print(outStr)
                     break
-                    
+
                 else:
                     outStr = 'I do not understand, try again...'
                     print(outStr)
-                    
+
         else:
             outStr = 'Something went wrong...'
             print(outStr)
-            
-        
+
+
         return 0
-        
-        
-        
+
+
+
     def refine(self):
-        ''' 
-        Substitutes the model flat for raw data and wipes 
+        '''
+        Substitutes the model flat for raw data and wipes
         exclusion regions. Use with caution; this is experimental,
         but could be useful for iteratively improving the flat.
         '''
@@ -659,25 +660,25 @@ class fitFlatClass(object):
         self.regionDict = {}
         self.refresh_plot()
         return 0
-        
+
     def save_flat(self,outFile,header=None):
         ''' Save the corrected flat. Assumes overwriting has been verified '''
-        
+
         # clear space
         if os.path.isfile(outFile):
             os.remove(outFile)
 
-        
+
         # write correct flat data
         if header is not None:
             hdu = fits.PrimaryHDU(self.flatCorrData,header)
         else:
             hdu = fits.PrimaryHDU(self.flatCorrData)
-        hdu.writeto(outFile,output_verify='ignore')  
-        
+        hdu.writeto(outFile,output_verify='ignore')
+
         return 0
-        
-        
+
+
 
 class flatFitRegion(object):
     ''' Class representing an exclusion region '''
@@ -711,7 +712,15 @@ def combine_flats(flat_list,MEDIAN_COMBINE=False,**kwargs):
     else:
         batchSize = len(flat_list)
 
+    # Sanitize flat list in case flats were taken with different settings
+    shapes = [fits.open(f)[0].data.shape for f in flat_list]
+    xshape = stats.mode([s[0] for s in shapes])[0][0]
+    yshape = stats.mode([s[1] for s in shapes])[0][0]
 
+    for file in copy.copy(flat_list):
+        shape = fits.open(file)[0].data.shape
+        if shape[0]!=xshape or shape[1]!=yshape:
+            flat_list.remove(file)
 
     # loop over the flat files
     for file in flat_list:
@@ -737,7 +746,7 @@ def combine_flats(flat_list,MEDIAN_COMBINE=False,**kwargs):
 
                 # if flat_comb_image is getting too big, or if we're at the end of flat_list,
                 # then squash it along the z axis with a median
-                if ((flat_comb_image.shape[2] == batchSize) or 
+                if ((flat_comb_image.shape[2] == batchSize) or
                     (flat_comb_image.shape[2] == len(flat_list)-1)):
 
                     # stack the intermediate squashed frames
@@ -771,14 +780,14 @@ def combine_flats(flat_list,MEDIAN_COMBINE=False,**kwargs):
     flat_comb_image *= expTime
 
     if outFile:
-        
+
         # clear space
         if os.path.isfile(outFile) and clobber:
             os.remove(outFile)
 
         # write correct flat data
         hdu = fits.PrimaryHDU(flat_comb_image,header)
-        hdu.writeto(outFile,output_verify='ignore')  
+        hdu.writeto(outFile,output_verify='ignore')
 
     return (flat_comb_image,header,inst)
 
@@ -849,7 +858,7 @@ def inspect_flat(flat_list,*args,**kwargs):
         List of flat field image filenames
 
     OUTFILE : string, optional
-        If specified, this will automatically be the file location of 
+        If specified, this will automatically be the file location of
         the output flat image
     DISPAXIS : int, optional (Default = 1)
         Specifies the dispersion axis of the image. DISPAXIS=1
@@ -862,7 +871,7 @@ def inspect_flat(flat_list,*args,**kwargs):
     -------
     int : 0, and writes files to disk
     '''
-    
+
     # unpack
     outFile = kwargs.get('OUTFILE',None)
     dispaxis = kwargs.get('DISPAXIS',1)
@@ -898,10 +907,10 @@ def inspect_flat(flat_list,*args,**kwargs):
         # for each column, divide by the median
         for i in range(len(flat_comb_image[0,:])):
             flat_comb_image[:,i] /= np.median(flat_comb_image[:,i])
-    
+
     # set up plotting window
     plt.ion()
-    
+
     fig=plt.figure(figsize=(16,8))
     axMain = plt.subplot2grid((36,36), (0,0), rowspan=36, colspan=36)
     ax1 = plt.subplot2grid((36,36), (0,0), rowspan=11, colspan=12)
@@ -909,21 +918,21 @@ def inspect_flat(flat_list,*args,**kwargs):
     ax3 = plt.subplot2grid((36,36), (0,24), rowspan=11, colspan=12)
     ax4 = plt.subplot2grid((36,36), (12,0), rowspan=12, colspan=36)
     ax5 = plt.subplot2grid((36,36), (24,0), rowspan=12, colspan=36)
-    
+
     # ax1 data
     bsd_col_lo = 0
     bsd_col_up = bsd_col_lo + 500
     blueSkyData = np.median(flat_comb_image[:,bsd_col_lo:bsd_col_up],axis=0)
     blueSkyX = np.arange(bsd_col_lo,bsd_col_up,1)
-    
-    
+
+
     # ax2 data
     # msd_col_lo = flat_comb_image.shape[1] // 2
     msd_col_lo = 1800
     msd_col_up = msd_col_lo + 300
     midSkyData = np.median(flat_comb_image[:,msd_col_lo:msd_col_up],axis=0)
     midSkyX = np.arange(msd_col_lo,msd_col_up,1)
-    
+
     # ax3 data
     # rsd_col_lo = flat_comb_image.shape[1] - 500
     rsd_col_lo = 3200
@@ -946,7 +955,7 @@ def inspect_flat(flat_list,*args,**kwargs):
     # image
     ax4.imshow(flat_comb_image,aspect=1.,origin='lower',
                 norm=colors.Normalize(vmin=vmin, vmax=vmax))
-    
+
     # residuals
     ax5.imshow(flat_comb_image,aspect=1.,origin='lower',
                 norm=colors.Normalize(vmin=vmin, vmax=vmax))
@@ -954,16 +963,16 @@ def inspect_flat(flat_list,*args,**kwargs):
     # ranges on image plots
     ax4.set_xlim([0,flat_comb_image.shape[1]])
     ax4.set_ylim([0,flat_comb_image.shape[0]])
-    
+
     ax5.set_xlim([0,flat_comb_image.shape[1]])
     ax5.set_ylim([0,flat_comb_image.shape[0]])
-    
+
     # sparse axis labels
     ax1.set_xlabel('column')
     ax1.set_ylabel('counts')
     ax2.set_xlabel('column')
     ax3.set_xlabel('column')
-    
+
     ax1.set_yticklabels([])
     ax2.set_yticklabels([])
     ax3.set_yticklabels([])
@@ -971,12 +980,12 @@ def inspect_flat(flat_list,*args,**kwargs):
     flatFitObj = fitFlatClass(flat_comb_image,fig,inst)
 
     while True:
-        
+
         # this really should be a dict of key/value pairs
         # and then the prompt is dynamically generated
         validResps = ['A','R','F','S','U','H',  # standard options
                       'AHARD','RHARD','REFINE', # poweruser/hidden options
-                      'W','D','Q','Q!']              # stardard ends 
+                      'W','D','Q','Q!']              # stardard ends
         promptStr = 'Enter (a) to add an exclusion region.\n'
         promptStr += 'Enter (r) to remove a region.\n'
         promptStr += 'Enter (f) to fit the exclusion regions.\n'
@@ -989,15 +998,15 @@ def inspect_flat(flat_list,*args,**kwargs):
         promptStr += 'Enter (q!) to quit and do nothing.'
         promptStr += 'Answer: '
         usrResp = raw_input(promptStr).strip().upper()
-        
+
         if usrResp in validResps:
-            
+
             # add region by marking it
             if usrResp == 'A':
                 promptStr = 'Enter the name of the sky region (e.g. c1): '
                 name = raw_input(promptStr).strip().upper()
                 flatFitObj.add_fit_region(name)
-                
+
             # add hardcoded region
             if usrResp == 'AHARD':
                 promptStr = 'Enter name colLo colUp (e.g. c1 113 171): '
@@ -1009,33 +1018,33 @@ def inspect_flat(flat_list,*args,**kwargs):
                     flatFitObj.add_fit_region(name,colLo=colLo,colUp=colUp)
                 except Exception as e:
                     print(e)
-                    
-                    
+
+
             # remove
             if usrResp == 'R' or usrResp == 'RHARD':
                 flatFitObj.remove_fit_region()
-                
+
             # fit sky
             if usrResp == 'F':
                 flatFitObj.fit_sky_background()
-              
-            # substitute model in sketchy regions  
+
+            # substitute model in sketchy regions
             if usrResp == 'S':
                 flatFitObj.subsitute_model_flat()
-                
+
             if usrResp == 'U':
                 flatFitObj = fitFlatClass(flat_comb_image,fig,inst)
                 flatFitObj.refresh_plot()
-                
+
             if usrResp == 'H':
                 flatFitObj.hard_mask()
-                
+
             if usrResp == 'REFINE':
                 # this substitutes the corrected
                 # flat for the input data...
                 # basically an experiment, not intended for use
                 flatFitObj.refine()
-            
+
             # write file
             if usrResp == 'W':
 
@@ -1065,7 +1074,6 @@ def inspect_flat(flat_list,*args,**kwargs):
             if usrResp == 'Q':
 
                 #mask problematic pixels
-                print (flatFitObj.flatCorrData[flatFitObj.flatCorrData <= 0.001])
                 flatFitObj.flatCorrData[flatFitObj.flatCorrData <= 0.001] = 1.
 
                 print('Saving and quitting.')
@@ -1098,9 +1106,9 @@ def inspect_flat(flat_list,*args,**kwargs):
         else:
             errStr = 'I don\'t understand, try again...'
             print(errStr)
-    
+
     return 0
-    
+
 if __name__=='__main__':
     ''' Run parsing, then main '''
     args,kwargs = parse_cmd_args()

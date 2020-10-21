@@ -1,6 +1,6 @@
 from __future__ import print_function
 import os,sys,pdb,argparse,glob,shutil,string,time,datetime
-import numpy as np 
+import numpy as np
 from astropy.io import fits
 from astropy.convolution import convolve
 from scipy import signal
@@ -20,7 +20,7 @@ def sigclipmedian(datain,sigmahi=3.5,sigmalo=3.5):
     ctgood = len(goodInds)
     if ctgood == 0:
         return np.nan
-    if ctgood == 1: 
+    if ctgood == 1:
         return data[goodInds[0]]
 
     data = data[goodInds]
@@ -66,8 +66,8 @@ def writefits(image,outfile,header='HEADER',CLOBBER=False):
         else:
             print('File exists, set CLOBBER=True or move the file')
             return 1
-    #Create HDU list and write in one go  
-    hdu.writeto(outfile,output_verify='ignore')  
+    #Create HDU list and write in one go
+    hdu.writeto(outfile,output_verify='ignore')
     return 0
 
 
@@ -138,7 +138,7 @@ def parse_cmd_args():
     kwargs['VERBOSE'] = cmdArgs.verbose
     kwargs['CLOBBER'] = cmdArgs.clobber
     kwargs['DEBUG'] = cmdArgs.debug
-    kwargs['outfile'] = cmdArgs.outfile 
+    kwargs['outfile'] = cmdArgs.outfile
     kwargs['maskfile'] = cmdArgs.maskfile
     kwargs['boxsize'] = cmdArgs.boxsize
     kwargs['nsigma'] = cmdArgs.nsigma
@@ -146,18 +146,18 @@ def parse_cmd_args():
 
     return (args,kwargs)
 
-# def pyzapspec(infile, 
+# def pyzapspec(infile,
 #               outfile='',
-#               maskfile='', 
+#               maskfile='',
 #               WRITE_OUTFILE=False,
 #               DEBUG_DIR='../test_data/',DEBUG=False,
 #               boxsize=7,nsigma=16.,subsigma=2.7,sfactor=1.0,
 #               nzap=0,mask=0,writemodel=0,verbose=0,skysubtract=0,
 #               zero=0,method=0,usamp=0,ybin=0,nan=-999,inmaskname=0,**kwargs):
 
-def pyzapspec(infile, 
+def pyzapspec(infile,
               outfile='',
-              maskfile='', 
+              maskfile='',
               WRITE_OUTFILE=False,
               DEBUG_DIR='../test_data/',DEBUG=False,
               boxsize=9,nsigma=15.,subsigma=2.8,sfactor=1.0,
@@ -220,7 +220,7 @@ def pyzapspec(infile,
     kernel = np.append(kernel,kernelRev)
     kernel = kernel / np.sum(kernel)
 
-    # pzap is convolving the 2D xmedimage with a 1D kernel, 
+    # pzap is convolving the 2D xmedimage with a 1D kernel,
     # I'm pretty sure this is just a row by row convolution.
     # for xrow in range(ny):
     for xrow in xrange(ny):
@@ -250,7 +250,7 @@ def pyzapspec(infile,
     kernel = np.append(kernel,kernelRev)
     kernel = kernel / np.sum(kernel)
 
-    # pzap is convolving the 2D xmedimage with a 1D kernel, 
+    # pzap is convolving the 2D xmedimage with a 1D kernel,
     # I'm pretty sure this is just a column by column convolution.
     # for ycol in range(nx):
     for ycol in xrange(nx):
@@ -265,7 +265,7 @@ def pyzapspec(infile,
     residualimage = skysubimage - filterimage
 
     sigmaimage = np.zeros((ny,nx)) + np.nan
-    nyb = round(ny / 200)
+    nyb = np.max([1, round(ny / 200)])
     yint = np.ceil(ny*1./nyb)
 
     # for yb in range(nyb):
@@ -303,7 +303,7 @@ def pyzapspec(infile,
         zapimage_ravel[crcores] = 1
 
 
-    # #this is hacky but MIGHT needed for host analysis 
+    # #this is hacky but MIGHT needed for host analysis
     # zapimage[50:80, 1280:1360] = 0 #halpha keck
     # zapimage_ravel = zapimage.ravel()
 
@@ -342,12 +342,12 @@ def pyzapspec(infile,
                 continue
 
                  # here's the structure assumed in the IDL
-                 # ci is the CR pixel we're looking at, 
+                 # ci is the CR pixel we're looking at,
                  # this is trying to check the neighboring pixels
 
-                 # ci-d0-1,    ci-d0,    ci-d0+1, 
-                 #    ci-1,      ci      ci+1, 
-                 # ci+d0-1,    ci+d0,    ci+d0+1 
+                 # ci-d0-1,    ci-d0,    ci-d0+1,
+                 #    ci-1,      ci      ci+1,
+                 # ci+d0-1,    ci+d0,    ci+d0+1
 
                  # the way the IDL where() function works in the original pzap code
                  # makes indexing the arrays this way trivial since it does the
@@ -362,8 +362,8 @@ def pyzapspec(infile,
                  # important thing to remember is that if you modify a VIEW of
                  # an array, it will modify your original array too.
 
-            coarseblockpos = np.array([       ci-d0, 
-                                        ci-1,        ci+1, 
+            coarseblockpos = np.array([       ci-d0,
+                                        ci-1,        ci+1,
                                               ci+d0])
             newzap = np.where( (np.fabs(residualnsigmaimage_ravel[coarseblockpos]) > subsigma) &
                                (zapimage_ravel[coarseblockpos] == 0) )[0]
@@ -390,8 +390,8 @@ def pyzapspec(infile,
             # this wasn't present in the IDL code, but I believe it's necessary
             if ci < d0-1 or ci > nx*ny-d0-2:
                 continue
-            coarseblockpos = np.array([ci-d0-1,    ci-d0,    ci-d0+1, 
-                                          ci-1,              ci+1, 
+            coarseblockpos = np.array([ci-d0-1,    ci-d0,    ci-d0+1,
+                                          ci-1,              ci+1,
                                        ci+d0-1,    ci+d0,    ci+d0+1])
             countneighbor_ravel[coarseblockpos] = countneighbor_ravel[coarseblockpos] + 1
 
@@ -407,7 +407,7 @@ def pyzapspec(infile,
     nbad = len(ibad)
 
     if nbad > 0:
-        skysubimage_ravel[ibad] = np.nan # NaNs ignored by median() and derivative image modelers 
+        skysubimage_ravel[ibad] = np.nan # NaNs ignored by median() and derivative image modelers
 
         # filterimage is really the replacement image (without sky and sources)
         filterimage = signal.medfilt2d(skysubimage,[boxsize,boxsize])
@@ -421,7 +421,7 @@ def pyzapspec(infile,
                 # so its ok that filterbad is not yet defined...
                 filterimage.ravel()[filterbad] = signal.medfilt2d(filterimage, [boxsize,boxsize]).ravel()[filterbad]
 
-            filterbad = np.where( ~np.isfinite(filterimage.ravel()) & 
+            filterbad = np.where( ~np.isfinite(filterimage.ravel()) &
                                    np.isfinite(xmedimage.ravel()) &
                                    np.isfinite(ymedimage.ravel()))[0]
             ctnan = len(filterbad)

@@ -91,7 +91,7 @@ def womcat(hop):
     print('\nEnter method to select wavelength ranges\n')
     mode=inputter_single('Enter (w)avelengths or mark with the (m)ouse? (w/m) ','wm')
     print('\nChoose end points of region to compute average\n')
-    
+
     waveb,waver,mode=womwaverange2(waveblue[indexblue:],fluxblue[indexblue:],
                                    wavered[0:indexred],fluxred[0:indexred]*fluxcor
                                    ,mode)
@@ -116,7 +116,7 @@ def womcat(hop):
         fluxblue=fluxblue*brscalefac
         varblue=varblue*brscalefac**2
 
-    # print("\nPlotting blue side as blue, red side as red\n") 
+    # print("\nPlotting blue side as blue, red side as red\n")
     # plt.cla()
     # plt.plot(waveblue[indexblueb:indexbluer+1],fluxblue[indexblueb:indexbluer+1],drawstyle='steps-mid',color='b')
     # plt.plot(wavered[indexredb:indexredr+1],fluxred[indexredb:indexredr+1],drawstyle='steps-mid',color='r')
@@ -146,7 +146,7 @@ def womcat(hop):
     #             done=True
 
     # print('\nChoose end points of region to compute average\n')
-    
+
     # waveb,waver,mode=womwaverange2(waveblue[indexblueb:indexbluer+1],
     #                                fluxblue[indexblueb:indexbluer+1],
     #                                wavered[indexredb:indexredr+1],
@@ -161,7 +161,10 @@ def womcat(hop):
         # overvar=(varblue[indexblueb:indexbluer+1]+varred[indexredb:indexredr+1])
 
         #replacing with inverse variance weighted average
-    overflux = np.average([fluxblue[indexblueb:indexbluer+1], fluxred[indexredb:indexredr+1]], 
+    delta = (indexbluer-indexblueb)-(indexredr-indexredb)
+    if delta!=0:
+        indexredr = indexredr + delta
+    overflux = np.average([fluxblue[indexblueb:indexbluer+1], fluxred[indexredb:indexredr+1]],
                             weights = [1./varblue[indexblueb:indexbluer+1], 1./varred[indexredb:indexredr+1]], axis = 0)
     overvar = np.sum([varblue[indexblueb:indexbluer+1], varred[indexredb:indexredr+1]], axis = 0)
     logging.info('Cat combined sides with inverse variance weighted average')
@@ -195,7 +198,7 @@ def womcat(hop):
                                                          waveblue[indexbluer]))
     plt.clf()
     axarr=fig.subplots(2)
-    
+
     axarr[0].plot(overwave,overflux,drawstyle='steps-mid',color='k')
     axarr[0].plot(waveblue[indexblueb:indexbluer+1], fluxblue[indexblueb:indexbluer+1],
              drawstyle='steps-mid',color='b')
