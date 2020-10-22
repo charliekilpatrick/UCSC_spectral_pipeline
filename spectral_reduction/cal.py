@@ -33,7 +33,7 @@ CALVERSION = 0.1
 
 def main():
     import headerfix
-    
+
     secondord = False
     gratcode2 = ''
     # logging straight from docs.python.org cookbook page
@@ -85,7 +85,7 @@ def main():
     # print('Enter the file containing the list of objects')
     # print('(should be dispersion-corrected)\n')
     done = False
-    while (not done):
+    while not done:
         # objectlist = inputter('Object list file: ', 'string', False)
         dfiles=glob.glob('d*.fits')
         for d in dfiles:

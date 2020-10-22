@@ -127,7 +127,7 @@ def kastbias(ifile,ofile):
     header['HISTORY'] = 'Overscan subtracted'
 
     # write new fits file
-    pyfits.writeto(ofile,datanew,header,clobber=True)
+    pyfits.writeto(ofile,datanew,header,clobber=True,output_verify='silentfix')
 
     return 0
 
@@ -174,7 +174,7 @@ def binospecbias(ifile,ofile,options):
     header['HISTORY'] = 'Overscan subtracted'
 
     # write new fits file
-    pyfits.writeto(ofile,datanew,header,clobber=True)
+    pyfits.writeto(ofile,datanew,header,clobber=True,output_verify='silentfix')
 
     return 0
 

@@ -25,14 +25,14 @@ def get_files(directory, args):
         files += glob.glob(resp_pattern)
 
     for file in files:
-        hdr0 = util.readhdr(img)
+        hdr0 = util.readhdr(file)
         _type=util.readkey3(hdr0, 'object')
-        if _type.startswith('arc'):
-            arc.append(img)
-        elif 'RESP' in img:
-            flat.append(img)
+        if _type.startswith('arc') or os.path.basename(file).startswith('ARC'):
+            arc.append(file)
+        elif 'RESP' in file:
+            flat.append(file)
         else:
-            science.append(img)
+            science.append(file)
 
     files = []
     if len(arc)==0 and len(args)==1:
@@ -49,14 +49,14 @@ def get_files(directory, args):
             files = glob.glob(flat_pattern)
 
     for file in files:
-        hdr0 = util.readhdr(img)
+        hdr0 = util.readhdr(file)
         _type=util.readkey3(hdr0, 'object')
         if _type.startswith('arc'):
-            arc.append(img)
-        elif 'RESP' in img:
-            flat.append(img)
+            arc.append(file)
+        elif 'RESP' in file:
+            flat.append(file)
         else:
-            science.append(img)
+            science.append(file)
 
     return(science, arc, flat)
 

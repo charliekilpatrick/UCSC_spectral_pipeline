@@ -74,9 +74,9 @@ def abcalc(wave, objectname):
     import numpy as np
     from tmath.wombat.inputter import inputter
     from tmath.wombat.womscipyrebin import womscipyrebin
-    
+
     idstar = 0
-    while (idstar < 1) or (idstar > 56):
+    while (idstar < 1) or (idstar > 57):
         print('The object is {}'.format(objectname))
         print(' ')
         print('  WHICH STANDARD STAR IS THIS ?')
@@ -109,7 +109,7 @@ def abcalc(wave, objectname):
         print('  (50) VMa 2                   (51) GD 71 ')
         print('  (52) HZ 43                   (53) LTT 7379')
         print('  (54) LTT 7987                (55) GD 153 ')
-        print('  (56) CD32D9927 ')
+        print('  (56) CD32D9927               (57) GD 50')
         idstar=inputter('Star number? ','int',False)
 
     #  All numbers from lolita's abcalc.f, we trust that they are ok
@@ -119,8 +119,8 @@ def abcalc(wave, objectname):
               4020.0, 4200.0, 4400.0, 4560.0, 4760.0, 5000.0, 5120.0, \
               5240.0, 5400.0, 5560.0, 5760.0, 6020.0, 6420.0, 6780.0, \
               7100.0, 7460.0, 7780.0, 8100.0, 8380.0, 8780.0, 9300.0, \
-              9700.0, 9940.0,10260.0,10820.0,11140.0,12000.0]        
-    ab = np.zeros((41, 57))
+              9700.0, 9940.0,10260.0,10820.0,11140.0,12000.0]
+    ab = np.zeros((41, 58))
     ab[:, 1] = [9.476, 9.391, 9.310, 9.232, 9.168, 9.103, 9.039, \
                 8.979, 8.945, 8.919, 8.849, 8.814, 8.762, 8.695, \
                 8.483, 8.385, 8.293, 8.235, 8.180, 8.118, 8.081, \
@@ -493,7 +493,7 @@ def abcalc(wave, objectname):
                10.090520, 10.032000, 9.9762198, 9.9617100, 9.9360398, \
                9.9185802, 9.9072905, 9.9031467, 9.9140937, 9.9183197, \
                9.9221601, 9.9244636, 9.9169998, 9.9169998, 9.9169998, \
-               9.9169998]                                           
+               9.9169998]
     ab[:,54]=[12.373000, 12.373000, 12.373000, 12.356440, 12.367000, \
               12.397760, 12.395280, 12.386800, 12.403720, 12.419600, \
               12.422360, 12.421640, 12.412320, 12.403216, 12.223200, \
@@ -522,7 +522,12 @@ def abcalc(wave, objectname):
               10.609200, 10.623360, 10.631999, 10.631999, 10.631999, \
               10.631999]
 
-
+    # GD50, added by CDK from ftp://ftp.eso.org/pub/stecf/standards/hststan/
+    ab[:,57]=[13.115,13.04,13.2,13.283,13.353,13.476,13.438,13.499,\
+                13.537,13.584,13.58,13.57,13.601,13.559,13.631,13.651,\
+                13.768,13.768,13.801,13.907,13.948,14.009,14.07,14.134,\
+                14.205,14.278,14.414,14.511,14.601,14.691,14.773,14.853,\
+                14.901,15.016,15.11,15.18,15.242,15.289,15.414,15.457,15.601]
 
     # use scipy interp here as the very non-linear wavelength scale
     # precludes the use of womashrebin --- this is going finer anyway
